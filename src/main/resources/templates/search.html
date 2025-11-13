@@ -1,0 +1,39 @@
+
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Web Search</title>
+    <style>
+        body { max-width: 800px; margin: 2rem auto; font-family: sans-serif; }
+        .sources { margin-top: 1.5rem; }
+        .source-item { margin-bottom: 0.75rem; }
+        pre { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+<h1>AI Web Search (Spring + Thymeleaf)</h1>
+
+<form method="get" th:action="@{/search}">
+    <input type="text" name="q" th:value="${query}" style="width: 70%;" />
+    <button type="submit">검색</button>
+</form>
+
+<div th:if="${result != null}">
+    <h2>답변</h2>
+    <pre th:text="${result.answer}"></pre>
+
+    <div class="sources">
+        <h3>출처</h3>
+        <ul>
+            <li th:each="s : ${result.sources}" class="source-item">
+                [<span th:text="${s.id}"></span>]
+                <a th:href="${s.url}" th:text="${s.title}" target="_blank"></a><br/>
+                <small th:text="${s.snippet}"></small>
+            </li>
+        </ul>
+    </div>
+</div>
+
+</body>
+</html>
