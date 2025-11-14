@@ -15,14 +15,14 @@ Spring Boot(Backend) + Thymeleaf(View) 기반으로 작동하며,
 ### ✔️ 1. 웹 검색 기능 (Brave Search API)
 
 * Brave Search API를 사용해 상위 웹 검색 결과를 수집
-* 제목, URL, snippet(요약) 반환
+* 제목, URL, description 반환
 * 나중에 “AI-friendly snippet”, “alternate snippet”도 확장 가능
 
 ### ✔️ 2. Gemini LLM 기반 출처 기반 요약
 
 * Brave 검색 결과를 LLM에 프롬프트로 전달
 * Gemini 모델이 **출처 번호([1], [2])가 포함된 근거 기반 답변 생성**
-* HTML 크롤링 대신 Brave의 snippet 사용 → 가볍고 빠름
+* HTML 크롤링 대신 Brave의 snippet 사용 → 가볍고 빠름 (예정)
 
 ### ✔️ 3. 안전한 API Key 관리
 
@@ -163,7 +163,7 @@ SearchService
      ↓
 ① callBraveSearch(query)
     → Brave Search API 호출
-    → 제목, URL, snippet 수집
+    → 제목, URL, description 수집
 
 ② callLLM(query, sources)
     → Gemini SDK 호출
