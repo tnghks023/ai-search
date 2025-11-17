@@ -10,7 +10,7 @@ description = 'ai-search project'
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(17)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
@@ -35,8 +35,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webflux'
 	implementation 'org.jsoup:jsoup:1.17.1'
 
-	// 🔹 Gemini Java SDK
-	implementation 'com.google.genai:google-genai:1.27.0'
+    // 🔹 Gemini Java SDK (commons-logging 제외)
+    implementation('com.google.genai:google-genai:1.27.0') {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
+
 }
 
 tasks.named('test') {

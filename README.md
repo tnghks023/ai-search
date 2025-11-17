@@ -41,7 +41,7 @@ Spring Boot(Backend) + Thymeleaf(View) 기반으로 작동하며,
 
 ### **Backend**
 
-* Java 17
+* Java 21
 * Spring Boot 3.5.7
 * Spring Web MVC
 * Spring WebFlux (WebClient)
