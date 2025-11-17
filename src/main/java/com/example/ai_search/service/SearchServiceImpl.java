@@ -3,7 +3,6 @@ package com.example.ai_search.service;
 import com.example.ai_search.dto.BraveSearchResponse;
 import com.example.ai_search.dto.SearchResponseDto;
 import com.example.ai_search.dto.SourceDto;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,6 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -32,7 +30,6 @@ public class SearchServiceImpl implements SearchService{
 
     private final WebClient braveWebClient;
     private final Client geminiClient;
-    private final ObjectMapper objectMapper;
 
     @Value("${search.api.key}")
     private String searchApiKey;
@@ -171,7 +168,8 @@ public class SearchServiceImpl implements SearchService{
             return text;
 
         } catch (Exception e) {
-            log.warn("Failed to fetch page text. url={}, reason={}", url, e.toString());
+            long elapsed = System.currentTimeMillis() - start;
+            log.warn("Failed to fetch page text. url={}, elapsedMs={} ,reason={}", url, elapsed, e.toString());
             return "";
         }
     }
