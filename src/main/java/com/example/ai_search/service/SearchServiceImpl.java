@@ -3,6 +3,7 @@ package com.example.ai_search.service;
 import com.example.ai_search.dto.BraveSearchResponse;
 import com.example.ai_search.dto.SearchResponseDto;
 import com.example.ai_search.dto.SourceDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.genai.Client;
 import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ public class SearchServiceImpl implements SearchService{
 
     private final WebClient braveWebClient;
     private final Client geminiClient;
+    private final ObjectMapper objectMapper;
 
     @Value("${search.api.key}")
     private String searchApiKey;
@@ -57,6 +59,8 @@ public class SearchServiceImpl implements SearchService{
     // -------------------- 1) Brave 검색 ---------------------------
     private List<SourceDto> callBraveSearch(String query) {
 
+        log.info("Search requested. query='{}'", query);
+
         Mono<List<SourceDto>> mono = braveWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/res/v1/web/search")
@@ -79,7 +83,20 @@ public class SearchServiceImpl implements SearchService{
                             return Mono.error(new BraveServerException("Brave 서버 오류 (5xx)."));
                         })
                 )
+
                 .bodyToMono(BraveSearchResponse.class)   // JSON -> DTO
+                // 전체 WebClient 체인 로그 (Reactor log)
+                .log("BRAVE_WEBCLIENT")
+                // 응답 resp 디버그 로그
+                .doOnNext(resp ->
+                        log.debug("Brave DTO response for query='{}', resultCount={}",
+                                query,
+                                resp.getWeb() != null && resp.getWeb().getResults() != null
+                                        ? resp.getWeb().getResults().size()
+                                        : 0
+                        )
+                )
+
                 .map(this::toSources)                    // DTO -> List<SourceDto>
                 .timeout(Duration.ofSeconds(2)) // 논리 타임아웃 (예: 2초 안에 못 끝나면 TimeoutException)
                 .retryWhen( // 재시도(backoff) 설정
@@ -95,6 +112,9 @@ public class SearchServiceImpl implements SearchService{
 
         // 최종적으로 동기 List로 받기
         List<SourceDto> sources = mono.block(Duration.ofSeconds(5)); // 전체 상한 5초 정도
+
+        log.info("Brave search done. query='{}', resultCount={}", query, sources != null ? sources.size() : 0);
+        
         return sources != null ? sources : List.of();
     }
     // Brave Search JSON → SourceDto 리스트로 변환하는 함수
@@ -119,11 +139,18 @@ public class SearchServiceImpl implements SearchService{
     // -------------------- 2) HTML → 텍스트 파싱 --------------------
     private String fetchPageText(String url) {
         try {
-            return Jsoup.connect(url)
+             String text = Jsoup.connect(url)
                     .timeout(5000)
                     .get()
-                    .text()
-                    .substring(0, 2000);   // 2000자까지만
+                    .text();
+
+            // 너무 길면 2000자까지만
+            if (text.length() > 2000) {
+                text = text.substring(0, 2000);
+            }
+
+            return text;
+
         } catch (Exception e) {
             log.warn("Failed to fetch page text. url={}, reason={}", url, e.toString());
             return "";
@@ -163,6 +190,7 @@ public class SearchServiceImpl implements SearchService{
                         prompt,
                         null           // 추가 설정 없으면 null
                 );
+
 
         return response.text();
     }

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+
+    <!-- 콘솔 로그 패턴 -->
+    <property name="CONSOLE_LOG_PATTERN"
+              value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+
+    <!-- 콘솔 출력 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+        </encoder>
+    </appender>
+
+    <!-- WebClient / Reactor 디버그용 -->
+    <logger name="org.springframework.web.reactive.function.client" level="DEBUG"/>
+    <logger name="reactor.netty.http.client" level="DEBUG"/>
+    <logger name="BRAVE_WEBCLIENT" level="DEBUG"/> <!-- .log("BRAVE_WEBCLIENT") 로그 출력 -->
+    <logger name="com.example.ai_search" level="DEBUG"/> <!-- 네 서비스 전체 DEBUG -->
+
+    <!-- 루트 로그 레벨 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+    </root>
+
+</configuration>

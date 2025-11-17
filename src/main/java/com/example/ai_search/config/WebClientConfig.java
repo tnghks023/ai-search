@@ -17,12 +17,6 @@ import java.time.Duration;
 @Configuration
 public class WebClientConfig {
 
-
-    //    @Bean
-//    public WebClient webClient() {
-//        return WebClient.builder().build();
-//    }
-
     @Value("${brave.api.base-url:https://api.search.brave.com}")
     private String braveBaseUrl;
 
