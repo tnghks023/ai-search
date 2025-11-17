@@ -21,6 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +43,9 @@ public class SearchServiceImpl implements SearchService{
     @Override
     public SearchResponseDto search(String query) {
 
+        long start = System.currentTimeMillis();
+        log.info("Search pipeline start. query='{}'", query);
+
         // 1) Brave Search API 호출
         List<SourceDto> sources = callBraveSearch(query);
 
@@ -53,12 +59,16 @@ public class SearchServiceImpl implements SearchService{
         // 3) LLM 호출하여, 출처 기반 답변 생성
         String answer = callLLM(query, sources, contents);
 
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("Search pipeline done. query='{}', totalMs={}", query, elapsed);
+
         return new SearchResponseDto(answer, sources);
     }
 
     // -------------------- 1) Brave 검색 ---------------------------
     private List<SourceDto> callBraveSearch(String query) {
 
+        long start = System.currentTimeMillis();
         log.info("Search requested. query='{}'", query);
 
         Mono<List<SourceDto>> mono = braveWebClient.get()
@@ -114,6 +124,9 @@ public class SearchServiceImpl implements SearchService{
         List<SourceDto> sources = mono.block(Duration.ofSeconds(5)); // 전체 상한 5초 정도
 
         log.info("Brave search done. query='{}', resultCount={}", query, sources != null ? sources.size() : 0);
+
+        long elapsed = System.currentTimeMillis() - start;
+        log.debug("Brave search success. elapsedMs={}",elapsed);
         
         return sources != null ? sources : List.of();
     }
@@ -138,6 +151,8 @@ public class SearchServiceImpl implements SearchService{
 
     // -------------------- 2) HTML → 텍스트 파싱 --------------------
     private String fetchPageText(String url) {
+
+        long start = System.currentTimeMillis();
         try {
              String text = Jsoup.connect(url)
                     .timeout(5000)
@@ -148,6 +163,10 @@ public class SearchServiceImpl implements SearchService{
             if (text.length() > 2000) {
                 text = text.substring(0, 2000);
             }
+
+            long elapsed = System.currentTimeMillis() - start;
+            log.debug("Jsoup fetch success. url='{}', elapsedMs={}, textLen={}",
+                    url, elapsed, text.length());
 
             return text;
 
@@ -183,16 +202,80 @@ public class SearchServiceImpl implements SearchService{
                 %s
                 """.formatted(query, context.toString());
 
-        // 3) Google Gen AI Java SDK로 호출
-        GenerateContentResponse response =
-                geminiClient.models.generateContent(
-                        llmModel,      // 예: "gemini-2.5-flash"
-                        prompt,
-                        null           // 추가 설정 없으면 null
-                );
+        // timeout + retry + fallback + logging
+
+        int maxAttempts = 3;             // 최대 3번 재시도
+        long backoffMillis = 300L;       // 초기 backoff 0.3초
+        long logicalTimeoutSec = 4L;     // 논리 타임아웃 4초
 
 
-        return response.text();
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            long start = System.currentTimeMillis();
+            try {
+                log.info("Gemini call start. attempt={}, query='{}', model={}",
+                        attempt, query, llmModel);
+
+                // 블로킹 SDK 호출을 논리 타임아웃으로 감싸기
+                CompletableFuture<GenerateContentResponse> future =
+                        CompletableFuture.supplyAsync(() ->
+                                geminiClient.models.generateContent(
+                                        llmModel,
+                                        prompt,
+                                        null
+                                )
+                        );
+
+                // 논리 타임아웃 적용 (예: 4초)
+                GenerateContentResponse response =
+                        future.get(logicalTimeoutSec, TimeUnit.SECONDS);
+
+                long elapsed = System.currentTimeMillis() - start;
+                String answer = response.text();
+
+                log.info("Gemini call success. attempt={}, elapsedMs={}, answerLength={}",
+                        attempt,
+                        elapsed,
+                        (answer != null ? answer.length() : 0));
+
+                log.debug("Gemini raw answer for query='{}': {}", query, answer);
+
+                return (answer != null && !answer.isBlank())
+                        ? answer
+                        : "지금은 답변이 비어 있습니다. 나중에 다시 시도해 주세요.";
+            }
+            catch (TimeoutException e) {
+                long elapsed = System.currentTimeMillis() - start;
+                log.warn("Gemini call timeout. attempt={}, elapsedMs={}, query='{}'",
+                        attempt, elapsed, query);
+            }
+            catch (Exception e) {
+                long elapsed = System.currentTimeMillis() - start;
+                log.warn("Gemini call failed. attempt={}, elapsedMs={}, query='{}', reason={}",
+                        attempt, elapsed, query, e.toString());
+            }
+
+            // 여기까지 왔다는 건 이번 attempt는 실패 → backoff 후 재시도
+            if (attempt < maxAttempts) {
+                try {
+                    log.debug("Gemini retry sleep {} ms before next attempt", backoffMillis);
+                    Thread.sleep(backoffMillis);
+                } catch (InterruptedException ie) {
+                    Thread.currentThread().interrupt();
+                    log.warn("Gemini retry sleep interrupted. aborting retries.");
+                    break;
+                }
+                backoffMillis *= 2; // 지수 backoff (0.3초 → 0.6초 → 1.2초)
+            }
+        }
+
+        // 모든 재시도 실패 → 최종 fallback
+        log.error("Gemini call failed after {} attempts. query='{}'", maxAttempts, query);
+
+        return """
+            죄송합니다, 현재는 질문에 대한 답변을 생성할 수 없습니다.
+            잠시 후 다시 시도해 주세요.
+            (검색은 수행되었으므로 아래 출처들을 직접 참고해 주세요.)
+            """;
     }
 
     // 커스텀 예외
