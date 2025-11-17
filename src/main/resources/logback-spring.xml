@@ -12,15 +12,28 @@
         </encoder>
     </appender>
 
-    <!-- WebClient / Reactor 디버그용 -->
-    <logger name="org.springframework.web.reactive.function.client" level="DEBUG"/>
-    <logger name="reactor.netty.http.client" level="DEBUG"/>
-    <logger name="BRAVE_WEBCLIENT" level="DEBUG"/> <!-- .log("BRAVE_WEBCLIENT") 로그 출력 -->
-    <logger name="com.example.ai_search" level="DEBUG"/> <!-- 네 서비스 전체 DEBUG -->
+    <!-- dev 프로파일 전용 설정 -->
+    <springProfile name="dev">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+        </root>
 
-    <!-- 루트 로그 레벨 -->
-    <root level="INFO">
-        <appender-ref ref="CONSOLE"/>
-    </root>
+        <!-- WebClient / Reactor 디버그 -->
+        <logger name="BRAVE_WEBCLIENT" level="DEBUG"/>
+        <logger name="reactor.netty.http.client" level="DEBUG"/>
+        <logger name="org.springframework.web.reactive.function.client" level="DEBUG"/>
+        <logger name="com.example.ai_search" level="DEBUG"/>
+    </springProfile>
 
+    <!-- prod 프로파일 전용 설정 -->
+    <springProfile name="prod">
+        <root level="INFO">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+
+        <logger name="BRAVE_WEBCLIENT" level="INFO"/> <!-- .log("BRAVE_WEBCLIENT") 로그 출력 -->
+        <logger name="reactor.netty.http.client" level="WARN"/>
+        <logger name="org.springframework.web.reactive.function.client" level="WARN"/>
+        <logger name="com.example.ai_search" level="INFO"/>
+    </springProfile>
 </configuration>
