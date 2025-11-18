@@ -55,16 +55,32 @@
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>
         <appender-ref ref="ERROR_FILE"/>
+        <appender-ref ref="JSON_FILE"/>
     </root>
 
 
     <!-- dev 프로파일 전용 설정 -->
     <springProfile name="dev">
+
+        <!-- JSON 로그 (ELK / Loki 용) -->
+        <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/app-json-dev.log</file>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <customFields>{"app":"ai-search","env":"dev"}</customFields>
+            </encoder>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/app-json-dev-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                <maxFileSize>10MB</maxFileSize>
+                <maxHistory>3</maxHistory>
+            </rollingPolicy>
+        </appender>
+
         <!-- dev에서는 DEBUG + 콘솔/파일/에러 모두 사용 -->
         <root level="DEBUG">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>
             <appender-ref ref="ERROR_FILE"/>
+            <appender-ref ref="JSON_FILE"/>
         </root>
 
         <!-- Thymeleaf 로그 줄이기 -->
@@ -79,6 +95,19 @@
 
     <!-- prod 프로파일 전용 설정 -->
     <springProfile name="prod">
+        <!-- JSON 로그 (ELK / Loki 용) -->
+        <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>${LOG_PATH}/app-json.log</file>
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <customFields>{"app":"ai-search","env":"prod"}</customFields>
+            </encoder>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>${LOG_PATH}/app-json-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+                <maxFileSize>10MB</maxFileSize>
+                <maxHistory>7</maxHistory>
+            </rollingPolicy>
+        </appender>
+
         <!-- prod에서는 INFO + 파일/에러 필수, 콘솔은 필요에 따라 유지/삭제 -->
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
