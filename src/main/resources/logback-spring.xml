@@ -4,7 +4,7 @@
     <!-- 콘솔 로그 패턴 -->
     <property name="LOG_PATH" value="logs"/>
     <property name="LOG_PATTERN"
-              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%X{traceId}] %logger{36} - %msg%n"/>
 
     <!-- 콘솔 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -73,6 +73,11 @@
                 <maxFileSize>10MB</maxFileSize>
                 <maxHistory>3</maxHistory>
             </rollingPolicy>
+
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!-- MDC(traceId)를 JSON에 같이 넣어줌 -->
+                <includeMdc>true</includeMdc>
+            </encoder>
         </appender>
 
         <!-- dev에서는 DEBUG + 콘솔/파일/에러 모두 사용 -->
@@ -106,6 +111,11 @@
                 <maxFileSize>10MB</maxFileSize>
                 <maxHistory>7</maxHistory>
             </rollingPolicy>
+
+            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <!-- MDC(traceId)를 JSON에 같이 넣어줌 -->
+                <includeMdc>true</includeMdc>
+            </encoder>
         </appender>
 
         <!-- prod에서는 INFO + 파일/에러 필수, 콘솔은 필요에 따라 유지/삭제 -->

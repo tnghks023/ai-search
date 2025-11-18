@@ -8,6 +8,7 @@ import com.google.genai.types.GenerateContentResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,9 @@ public class SearchServiceImpl implements SearchService{
         long start = System.currentTimeMillis();
         log.info("Search requested. query='{}'", query);
 
+        String traceId = MDC.get("traceId"); // 필터에서 넣은 값
+
+
         Mono<List<SourceDto>> mono = braveWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/res/v1/web/search")
@@ -76,6 +80,11 @@ public class SearchServiceImpl implements SearchService{
                         .build()
                 )
                 .header("X-Subscription-Token", searchApiKey)
+                .headers(headers -> {
+                    if (traceId != null) {
+                        headers.add("X-Trace-Id", traceId);
+                    }
+                })
                 .retrieve()
                 // 4xx / 5xx 별도 처리
                 .onStatus(HttpStatusCode::is4xxClientError, resp ->
@@ -210,8 +219,6 @@ public class SearchServiceImpl implements SearchService{
 
     // -------------------- 3) LLM(Gemini) 호출 ----------------------
     private String callLLM(String query, List<SourceDto> sources, List<String> contents) {
-
-
 
         // 1) 출처 + 내용 텍스트로 합치기
         StringBuilder context = new StringBuilder();
