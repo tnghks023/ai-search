@@ -2,21 +2,73 @@
 <configuration>
 
     <!-- 콘솔 로그 패턴 -->
-    <property name="CONSOLE_LOG_PATTERN"
-              value="%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    <property name="LOG_PATH" value="logs"/>
+    <property name="LOG_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
 
-    <!-- 콘솔 출력 -->
+    <!-- 콘솔 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
-            <pattern>${CONSOLE_LOG_PATTERN}</pattern>
+            <pattern>${LOG_PATTERN}</pattern>
         </encoder>
     </appender>
 
+    <!-- 파일 + 일자별 롤링 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/app.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- 날짜 + 인덱스 -->
+            <fileNamePattern>${LOG_PATH}/app-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <!-- 파일당 최대 크기 -->
+            <maxFileSize>10MB</maxFileSize>
+            <!-- 보관 기간 -->
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${LOG_PATH}/error.log</file>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+        </encoder>
+
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+        <onMismatch>DENY</onMismatch>
+        </filter>
+
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/error-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+        </rollingPolicy>
+    </appender>
+
+    <!-- 기본 root (프로파일 없을 때나 공통 기본값용) -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+
+
     <!-- dev 프로파일 전용 설정 -->
     <springProfile name="dev">
+        <!-- dev에서는 DEBUG + 콘솔/파일/에러 모두 사용 -->
         <root level="DEBUG">
             <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
         </root>
+
+        <!-- Thymeleaf 로그 줄이기 -->
+        <logger name="org.thymeleaf" level="WARN"/>
 
         <!-- WebClient / Reactor 디버그 -->
         <logger name="BRAVE_WEBCLIENT" level="DEBUG"/>
@@ -27,13 +79,21 @@
 
     <!-- prod 프로파일 전용 설정 -->
     <springProfile name="prod">
+        <!-- prod에서는 INFO + 파일/에러 필수, 콘솔은 필요에 따라 유지/삭제 -->
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
         </root>
+
+        <!-- Thymeleaf 로그 줄이기 -->
+        <logger name="org.thymeleaf" level="ERROR"/>
 
         <logger name="BRAVE_WEBCLIENT" level="INFO"/> <!-- .log("BRAVE_WEBCLIENT") 로그 출력 -->
         <logger name="reactor.netty.http.client" level="WARN"/>
         <logger name="org.springframework.web.reactive.function.client" level="WARN"/>
         <logger name="com.example.ai_search" level="INFO"/>
     </springProfile>
+
+
 </configuration>

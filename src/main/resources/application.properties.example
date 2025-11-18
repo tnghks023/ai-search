@@ -2,6 +2,7 @@ spring.application.name=ai-search
 server.port=8080
 spring.thymeleaf.cache=false
 
+spring.profiles.active=dev
 
 search.api.key=${SEARCH_API_KEY}
 llm.api.key=${LLM_API_KEY}

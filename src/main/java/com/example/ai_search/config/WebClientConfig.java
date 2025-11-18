@@ -23,12 +23,7 @@ public class WebClientConfig {
     @Bean
     public WebClient braveWebClient(WebClient.Builder builder) {
         HttpClient httpClient = HttpClient.create()
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000)
-                .responseTimeout(Duration.ofSeconds(3))
-                .doOnConnected(conn -> conn
-                        .addHandlerLast(new ReadTimeoutHandler(3))
-                        .addHandlerLast(new WriteTimeoutHandler(3))
-                );
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 2000); // TCP 연결 자체를 2초 안에 못 맺으면 실패
 
         return builder
                 .baseUrl(braveBaseUrl)

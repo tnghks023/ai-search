@@ -19,9 +19,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
+import java.util.concurrent.*;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +28,11 @@ public class SearchServiceImpl implements SearchService{
 
     private final WebClient braveWebClient;
     private final Client geminiClient;
+    private final ExecutorService jsoupExecutor =
+            Executors.newFixedThreadPool(8); // jsoup 전용 풀
+
+    private final ExecutorService llmExecutor =
+            Executors.newFixedThreadPool(8); // LLM 전용 풀
 
     @Value("${search.api.key}")
     private String searchApiKey;
@@ -47,11 +50,8 @@ public class SearchServiceImpl implements SearchService{
         List<SourceDto> sources = callBraveSearch(query);
 
         // 2) 각 URL 본문 가져오기 (간단 버전: Jsoup + text() )
-        List<String> contents = new ArrayList<>();
-        for (SourceDto s : sources) {
-            String text = fetchPageText(s.getUrl());
-            contents.add(text);
-        }
+        // Jsoup 병렬 텍스트 수집
+        List<String> contents = fetchPageTextsParallel(sources);
 
         // 3) LLM 호출하여, 출처 기반 답변 생성
         String answer = callLLM(query, sources, contents);
@@ -103,14 +103,13 @@ public class SearchServiceImpl implements SearchService{
                                         : 0
                         )
                 )
-
                 .map(this::toSources)                    // DTO -> List<SourceDto>
-                .timeout(Duration.ofSeconds(2)) // 논리 타임아웃 (예: 2초 안에 못 끝나면 TimeoutException)
                 .retryWhen( // 재시도(backoff) 설정
                         Retry.backoff(2, Duration.ofMillis(200)) // 최대 2번 재시도, 0.2초부터 backoff
                                 .filter(ex -> !(ex instanceof BraveClientException))
                         // 4xx(클라이언트 에러)는 재시도해도 의미 없으니 제외
                 )
+                .timeout(Duration.ofSeconds(3))
                 // 최종 fallback: 완전히 실패 시 빈 리스트 리턴
                 .onErrorResume(ex -> {
                     log.warn("Brave search failed, fallback to empty sources. reason={}", ex.toString());
@@ -118,7 +117,7 @@ public class SearchServiceImpl implements SearchService{
                 });
 
         // 최종적으로 동기 List로 받기
-        List<SourceDto> sources = mono.block(Duration.ofSeconds(5)); // 전체 상한 5초 정도
+        List<SourceDto> sources = mono.block();
 
         log.info("Brave search done. query='{}', resultCount={}", query, sources != null ? sources.size() : 0);
 
@@ -152,7 +151,7 @@ public class SearchServiceImpl implements SearchService{
         long start = System.currentTimeMillis();
         try {
              String text = Jsoup.connect(url)
-                    .timeout(5000)
+                    .timeout(2000)
                     .get()
                     .text();
 
@@ -174,12 +173,50 @@ public class SearchServiceImpl implements SearchService{
         }
     }
 
+    private List<String> fetchPageTextsParallel(List<SourceDto> sources) {
+
+        // 1) 각 source마다 비동기 Jsoup 작업 만들기
+        List<CompletableFuture<String>> futures = sources.stream()
+                .map(source ->
+                        CompletableFuture.supplyAsync(
+                                () -> fetchPageText(source.getUrl()), // 기존 메서드 재사용
+                                jsoupExecutor
+                        )
+                )
+                .toList();
+
+        // 2) 각 future에서 결과 받기 (여기서도 전체 timeout을 줄 수 있음)
+        List<String> contents = new ArrayList<>(futures.size());
+
+        for (int i = 0; i < futures.size(); i++) {
+            CompletableFuture<String> f = futures.get(i);
+            try {
+                // 한 URL당 최대 3초까지만 기다림 (논리 timeout)
+                String text = f.get(3, TimeUnit.SECONDS);
+                contents.add(text != null ? text : "");
+            } catch (TimeoutException e) {
+                log.warn("Jsoup async timeout for source index={}", i);
+                f.cancel(true); // 타임아웃 나면 취소 시도
+                contents.add("");
+            } catch (Exception e) {
+                log.warn("Jsoup async failed for source index={}, reason={}", i, e.toString());
+                contents.add("");
+            }
+        }
+
+        return contents;
+    }
+
+
     // -------------------- 3) LLM(Gemini) 호출 ----------------------
     private String callLLM(String query, List<SourceDto> sources, List<String> contents) {
 
+
+
         // 1) 출처 + 내용 텍스트로 합치기
         StringBuilder context = new StringBuilder();
-        for (int i = 0; i < sources.size(); i++) {
+
+        for (int i = 0; i < Math.min(sources.size(), contents.size()); i++) {
             SourceDto s = sources.get(i);
             String c = contents.get(i);
 
@@ -201,29 +238,27 @@ public class SearchServiceImpl implements SearchService{
                 """.formatted(query, context.toString());
 
         // timeout + retry + fallback + logging
-
-        int maxAttempts = 3;             // 최대 3번 재시도
+        int maxAttempts = 2;             // 최대 2번 재시도
         long backoffMillis = 300L;       // 초기 backoff 0.3초
         long logicalTimeoutSec = 4L;     // 논리 타임아웃 4초
 
-
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             long start = System.currentTimeMillis();
+            CompletableFuture<GenerateContentResponse> future = null;
             try {
                 log.info("Gemini call start. attempt={}, query='{}', model={}",
                         attempt, query, llmModel);
 
-                // 블로킹 SDK 호출을 논리 타임아웃으로 감싸기
-                CompletableFuture<GenerateContentResponse> future =
-                        CompletableFuture.supplyAsync(() ->
+                future = CompletableFuture.supplyAsync(() ->
                                 geminiClient.models.generateContent(
                                         llmModel,
                                         prompt,
                                         null
-                                )
-                        );
+                                ),
+                        llmExecutor
+                );
 
-                // 논리 타임아웃 적용 (예: 4초)
+
                 GenerateContentResponse response =
                         future.get(logicalTimeoutSec, TimeUnit.SECONDS);
 
@@ -245,11 +280,17 @@ public class SearchServiceImpl implements SearchService{
                 long elapsed = System.currentTimeMillis() - start;
                 log.warn("Gemini call timeout. attempt={}, elapsedMs={}, query='{}'",
                         attempt, elapsed, query);
+                if (future != null) {
+                    future.cancel(true); // 🔥 타임아웃 나면 취소 시도
+                }
             }
             catch (Exception e) {
                 long elapsed = System.currentTimeMillis() - start;
                 log.warn("Gemini call failed. attempt={}, elapsedMs={}, query='{}', reason={}",
                         attempt, elapsed, query, e.toString());
+                if (future != null) {
+                    future.cancel(true); // 🔥 타임아웃 나면 취소 시도
+                }
             }
 
             // 여기까지 왔다는 건 이번 attempt는 실패 → backoff 후 재시도
@@ -262,7 +303,7 @@ public class SearchServiceImpl implements SearchService{
                     log.warn("Gemini retry sleep interrupted. aborting retries.");
                     break;
                 }
-                backoffMillis *= 2; // 지수 backoff (0.3초 → 0.6초 → 1.2초)
+                backoffMillis *= 2; // 지수 backoff (0.3초 → 0.6초)
             }
         }
 
