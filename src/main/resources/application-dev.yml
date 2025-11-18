@@ -1,0 +1,9 @@
+# application-dev.yml
+spring:
+  profiles:
+    active: dev
+
+logging:
+  level:
+    root: DEBUG
+    com.example.ai_search: DEBUG

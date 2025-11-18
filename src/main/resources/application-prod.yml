@@ -1,0 +1,9 @@
+# application-prod.yml
+spring:
+  profiles:
+    active: prod
+
+logging:
+  level:
+    root: INFO
+    com.example.ai_search: INFO
