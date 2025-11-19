@@ -44,21 +44,38 @@ public class SearchServiceImpl implements SearchService{
     @Override
     public SearchResponseDto search(String query) {
 
-        long start = System.currentTimeMillis();
+        long totalStart  = System.currentTimeMillis();
         log.info("Search pipeline start. query='{}'", query);
 
         // 1) Brave Search API 호출
+        long braveStart = System.currentTimeMillis();
         List<SourceDto> sources = callBraveSearch(query);
+        long braveMs = System.currentTimeMillis() - braveStart;
 
         // 2) 각 URL 본문 가져오기 (간단 버전: Jsoup + text() )
         // Jsoup 병렬 텍스트 수집
+        long jsoupStart = System.currentTimeMillis();
         List<String> contents = fetchPageTextsParallel(sources);
+        long jsoupMs = System.currentTimeMillis() - jsoupStart;
+
 
         // 3) LLM 호출하여, 출처 기반 답변 생성
+        long llmStart = System.currentTimeMillis();
         String answer = callLLM(query, sources, contents);
+        long llmMs = System.currentTimeMillis() - llmStart;
 
-        long elapsed = System.currentTimeMillis() - start;
-        log.info("Search pipeline done. query='{}', totalMs={}", query, elapsed);
+        long totalMs = System.currentTimeMillis() - totalStart;
+        int sourceCount = (sources != null ? sources.size() : 0);
+
+        log.info(
+                "Search pipeline summary. query='{}', sources={}, braveMs={}, jsoupMs={}, llmMs={}, totalMs={}",
+                query,
+                sourceCount,
+                braveMs,
+                jsoupMs,
+                llmMs,
+                totalMs
+        );
 
         return new SearchResponseDto(answer, sources);
     }
