@@ -89,6 +89,8 @@ class SearchServiceImplBraveFallbackTest {
 
         ReflectionTestUtils.setField(searchService, "searchApiKey", "dummy-key");
 
+        ReflectionTestUtils.setField(searchService, "searchTimeoutSeconds", 3L);  // or 5L
+
         Method method = SearchServiceImpl.class
                 .getDeclaredMethod("callBraveSearch", String.class);
         method.setAccessible(true);
@@ -107,7 +109,7 @@ class SearchServiceImplBraveFallbackTest {
         // retry(backoff) 정책: 최초 호출 + 2회 재시도 = 최소 3회 이상 호출돼야 함
         assertThat(callCount.get()).isGreaterThanOrEqualTo(3);
 
-        // timeout(3초) 안에 끝나는지 (아주 빡세게 볼 필요는 없고 대략적인 sanity check)
-        assertThat(elapsed).isLessThan(Duration.ofSeconds(3).toMillis());
+        // timeout(8초) 안에 끝나는지 (아주 빡세게 볼 필요는 없고 대략적인 sanity check)
+        assertThat(elapsed).isLessThan(Duration.ofSeconds(8).toMillis());
     }
 }

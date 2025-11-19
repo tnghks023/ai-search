@@ -122,7 +122,6 @@ public class SearchServiceImpl implements SearchService{
                             return Mono.error(new BraveServerException("Brave 서버 오류 (5xx)."));
                         })
                 )
-
                 .bodyToMono(BraveSearchResponse.class)   // JSON -> DTO
                 // 전체 WebClient 체인 로그 (Reactor log)
                 .log("BRAVE_WEBCLIENT")

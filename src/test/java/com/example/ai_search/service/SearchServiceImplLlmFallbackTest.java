@@ -19,7 +19,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class SearchServiceImplFallbackTest {
+class SearchServiceImplLlmFallbackTest {
 
     @Test
     @DisplayName("Gemini가 계속 실패하면 fallback 문구를 반환한다")
