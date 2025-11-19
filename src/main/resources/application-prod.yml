@@ -1,9 +1,9 @@
 # application-prod.yml
-spring:
-  profiles:
-    active: prod
+search:
+  api:
+    key: ${SEARCH_API_KEY}
 
-logging:
-  level:
-    root: INFO
-    com.example.ai_search: INFO
+llm:
+  model: gemini-2.0-flash-lite
+  api:
+    key: ${LLM_API_KEY}
