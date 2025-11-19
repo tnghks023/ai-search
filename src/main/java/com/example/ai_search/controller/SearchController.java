@@ -17,6 +17,11 @@ public class SearchController {
 
     private final SearchService searchService;
 
+    @GetMapping("/")
+    public String rootRedirect() {
+        return "redirect:/search";
+    }
+
     @GetMapping("/search")
     public String searchPage(
             @RequestParam(name = "q", required = false)  String query,
