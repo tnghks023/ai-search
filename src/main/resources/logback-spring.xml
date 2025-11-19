@@ -65,9 +65,6 @@
         <!-- JSON 로그 (ELK / Loki 용) -->
         <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>${LOG_PATH}/app-json-dev.log</file>
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <customFields>{"app":"ai-search","env":"dev"}</customFields>
-            </encoder>
             <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
                 <fileNamePattern>${LOG_PATH}/app-json-dev-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
                 <maxFileSize>10MB</maxFileSize>
@@ -75,6 +72,7 @@
             </rollingPolicy>
 
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+                <customFields>{"app":"ai-search","env":"dev"}</customFields>
                 <!-- MDC(traceId)를 JSON에 같이 넣어줌 -->
                 <includeMdc>true</includeMdc>
             </encoder>
@@ -103,9 +101,6 @@
         <!-- JSON 로그 (ELK / Loki 용) -->
         <appender name="JSON_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
             <file>${LOG_PATH}/app-json.log</file>
-            <encoder class="net.logstash.logback.encoder.LogstashEncoder">
-                <customFields>{"app":"ai-search","env":"prod"}</customFields>
-            </encoder>
             <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
                 <fileNamePattern>${LOG_PATH}/app-json-%d{yyyy-MM-dd}.%i.log</fileNamePattern>
                 <maxFileSize>10MB</maxFileSize>
@@ -114,6 +109,7 @@
 
             <encoder class="net.logstash.logback.encoder.LogstashEncoder">
                 <!-- MDC(traceId)를 JSON에 같이 넣어줌 -->
+                <customFields>{"app":"ai-search","env":"prod"}</customFields>
                 <includeMdc>true</includeMdc>
             </encoder>
         </appender>
@@ -123,6 +119,7 @@
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>
             <appender-ref ref="ERROR_FILE"/>
+            <appender-ref ref="JSON_FILE"/>
         </root>
 
         <!-- Thymeleaf 로그 줄이기 -->
