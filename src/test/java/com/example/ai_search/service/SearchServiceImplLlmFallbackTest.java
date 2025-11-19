@@ -12,11 +12,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.lang.reflect.Method;
+import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SearchServiceImplLlmFallbackTest {
@@ -71,5 +73,67 @@ class SearchServiceImplLlmFallbackTest {
                 .contains("죄송합니다, 현재는 질문에 대한 답변을 생성할 수 없습니다.")
                 .contains("잠시 후 다시 시도해 주세요.")
                 .contains("아래 출처들을 직접 참고해 주세요.");
+    }
+
+    @Test
+    @DisplayName("Gemini 예외 발생 시 최대 2회까지 재시도(backoff) 후 fallback 문구를 반환한다")
+    void callLLM_retriesTwiceAndThenFallback_whenGeminiAlwaysThrows() throws Exception {
+        // given
+        WebClient braveWebClient = mock(WebClient.class);
+
+        Client geminiClient = mock(Client.class);
+        Models models = mock(Models.class);
+        ReflectionTestUtils.setField(geminiClient, "models", models);
+
+        SearchServiceImpl searchService = new SearchServiceImpl(braveWebClient, geminiClient);
+        ReflectionTestUtils.setField(searchService, "llmModel", "test-model");
+        ReflectionTestUtils.setField(searchService, "llmTimeoutSeconds", 12L);
+
+        // generateContent 호출 횟수 카운트
+        AtomicInteger callCount = new AtomicInteger(0);
+
+        when(models.generateContent(anyString(), anyString(), isNull()))
+                .thenAnswer(invocation -> {
+                    callCount.incrementAndGet();
+                    throw new RuntimeException("Gemini error");
+                });
+
+        List<SourceDto> sources = List.of(
+                new SourceDto(1, "테스트 제목", "https://example.com", "테스트 스니펫")
+        );
+        List<String> contents = List.of("본문 내용 일부");
+
+        Method callLlmMethod = SearchServiceImpl.class
+                .getDeclaredMethod("callLLM", String.class, List.class, List.class);
+        callLlmMethod.setAccessible(true);
+
+        long start = System.currentTimeMillis();
+
+        // when
+        String answer = (String) callLlmMethod.invoke(
+                searchService,
+                "테스트 질문입니다.",
+                sources,
+                contents
+        );
+
+        long elapsed = System.currentTimeMillis() - start;
+
+        // then
+        // 1) 최종적으로 fallback 문구를 반환해야 함
+        assertThat(answer)
+                .isNotNull()
+                .contains("죄송합니다, 현재는 질문에 대한 답변을 생성할 수 없습니다.");
+
+        // 2) generateContent()는 최대 시도 횟수(2회)만큼 호출되어야 함
+        assertThat(callCount.get())
+                .as("Gemini generateContent 호출 횟수")
+                .isEqualTo(2);
+
+        // 3) 논리 타임아웃(4초) + backoff(0.3s → 0.6s)를 감안해도,
+        //    예외를 즉시 던지는 mock이므로 수 초씩 기다리지는 않아야 함 (sanity check 용)
+        assertThat(elapsed)
+                .as("전체 LLM 호출 시간")
+                .isLessThan(Duration.ofSeconds(5).toMillis());
     }
 }

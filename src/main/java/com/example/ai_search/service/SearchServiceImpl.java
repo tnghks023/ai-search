@@ -286,7 +286,6 @@ public class SearchServiceImpl implements SearchService{
                         llmExecutor
                 );
 
-
                 GenerateContentResponse response =
                         future.get(llmTimeoutSeconds, TimeUnit.SECONDS);
 
