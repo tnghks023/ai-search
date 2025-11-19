@@ -4,9 +4,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
-        "SEARCH_API_KEY=dummy",
-        "LLM_API_KEY=dummy",
-        "SPRING_PROFILES_ACTIVE=dev"
+        "llm.api.key=dummy-llm-key",
+        "llm.model=gemini-test-model",
+        "search.api.key=dummy-search-key",
+        "spring.profiles.active=dev"
 })
 class AiSearchApplicationTests {
 
