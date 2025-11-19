@@ -35,11 +35,18 @@ public class SearchServiceImpl implements SearchService{
     private final ExecutorService llmExecutor =
             Executors.newFixedThreadPool(8); // LLM 전용 풀
 
+
     @Value("${search.api.key}")
     private String searchApiKey;
 
     @Value("${llm.model}")
     private String llmModel;
+
+    @Value("${search.api.timeout-seconds:8}")
+    private long searchTimeoutSeconds;
+
+    @Value("${llm.timeout-seconds:12}")
+    private long llmTimeoutSeconds;
 
     @Override
     public SearchResponseDto search(String query) {
@@ -88,7 +95,6 @@ public class SearchServiceImpl implements SearchService{
 
         String traceId = MDC.get("traceId"); // 필터에서 넣은 값
 
-
         Mono<List<SourceDto>> mono = braveWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/res/v1/web/search")
@@ -135,7 +141,7 @@ public class SearchServiceImpl implements SearchService{
                                 .filter(ex -> !(ex instanceof BraveClientException))
                         // 4xx(클라이언트 에러)는 재시도해도 의미 없으니 제외
                 )
-                .timeout(Duration.ofSeconds(3))
+                .timeout(Duration.ofSeconds(searchTimeoutSeconds))
                 // 최종 fallback: 완전히 실패 시 빈 리스트 리턴
                 .onErrorResume(ex -> {
                     log.warn("Brave search failed, fallback to empty sources. reason={}", ex.toString());
@@ -264,7 +270,6 @@ public class SearchServiceImpl implements SearchService{
         // timeout + retry + fallback + logging
         int maxAttempts = 2;             // 최대 2번 재시도
         long backoffMillis = 300L;       // 초기 backoff 0.3초
-        long logicalTimeoutSec = 4L;     // 논리 타임아웃 4초
 
         for (int attempt = 1; attempt <= maxAttempts; attempt++) {
             long start = System.currentTimeMillis();
@@ -284,7 +289,7 @@ public class SearchServiceImpl implements SearchService{
 
 
                 GenerateContentResponse response =
-                        future.get(logicalTimeoutSec, TimeUnit.SECONDS);
+                        future.get(llmTimeoutSeconds, TimeUnit.SECONDS);
 
                 long elapsed = System.currentTimeMillis() - start;
                 String answer = response.text();

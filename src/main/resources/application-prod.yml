@@ -2,8 +2,10 @@
 search:
   api:
     key: ${SEARCH_API_KEY}
+    timeout-second: 8 # Brave 검색 타임아웃
 
 llm:
   model: gemini-2.0-flash-lite
   api:
     key: ${LLM_API_KEY}
+  timeout-seconds: # Gemini 타임아웃
