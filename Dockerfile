@@ -10,7 +10,8 @@ COPY . .
 RUN chmod +x ./gradlew
 
 # 테스트는 빼고 빌드
-RUN ./gradlew clean build -x test
+# RUN ./gradlew clean build -x test
+RUN ./gradlew clean build
 
 # 2단계: 실행용 이미지
 FROM eclipse-temurin:21-jre
