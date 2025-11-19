@@ -98,7 +98,7 @@ LLM 호출은 `SearchServiceImpl.callLLM()`에서 수행하며:
 * `llmExecutor = Executors.newFixedThreadPool(8)`
   → LLM 호출 전용 스레드 풀
 * 최대 **2회 재시도**
-* 시도당 **논리 타임아웃 4초** (`future.get(4, TimeUnit.SECONDS)`)
+* 시도당 **논리 타임아웃 12초** (`future.get(llmTimeoutSeconds, TimeUnit.SECONDS)`)
 * 시도 실패 시:
 
     * `TimeoutException` → WARN 로그 + future 취소
