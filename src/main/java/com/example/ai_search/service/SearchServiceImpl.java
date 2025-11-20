@@ -59,6 +59,21 @@ public class SearchServiceImpl implements SearchService{
         List<SourceDto> sources = callBraveSearch(query);
         long braveMs = System.currentTimeMillis() - braveStart;
 
+        // Brave 실패하면 LLM 스킵
+        if (sources.isEmpty()) {
+            long totalMs = System.currentTimeMillis() - totalStart;
+
+            log.warn("No sources from Brave. Skip Jsoup/LLM. query='{}', braveMs={}, totalMs={}",
+                    query, braveMs, totalMs);
+
+            String answer = """
+            죄송합니다, 현재는 외부 검색(Brave)에서 결과를 가져오지 못했습니다.
+            잠시 후 다시 시도해 주세요.
+            """;
+
+            return new SearchResponseDto(answer, List.of());
+        }
+
         // 2) 각 URL 본문 가져오기 (간단 버전: Jsoup + text() )
         // Jsoup 병렬 텍스트 수집
         long jsoupStart = System.currentTimeMillis();
