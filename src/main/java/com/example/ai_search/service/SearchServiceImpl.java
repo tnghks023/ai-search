@@ -80,7 +80,6 @@ public class SearchServiceImpl implements SearchService{
         List<String> contents = fetchPageTextsParallel(sources);
         long jsoupMs = System.currentTimeMillis() - jsoupStart;
 
-
         // 3) LLM 호출하여, 출처 기반 답변 생성
         long llmStart = System.currentTimeMillis();
         String answer = callLLM(query, sources, contents);
