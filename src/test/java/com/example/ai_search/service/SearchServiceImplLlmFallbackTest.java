@@ -27,22 +27,19 @@ class SearchServiceImplLlmFallbackTest {
     @DisplayName("Gemini가 계속 실패하면 fallback 문구를 반환한다")
     void callLLM_returnsFallback_whenGeminiAlwaysFails() throws Exception {
         // given
-        // 1) WebClient는 이 테스트에서 사용 안 하므로 그냥 mock만 생성
-        WebClient braveWebClient = Mockito.mock(WebClient.class);
 
-        // 2) Gemini Client + Models mock 준비
+        // Gemini Client + Models mock 준비
         Client geminiClient = Mockito.mock(Client.class);
         Models models = Mockito.mock(Models.class);
-
 
         // Client 내부의 models 필드에 우리가 만든 mock 주입
         ReflectionTestUtils.setField(geminiClient, "models", models);
 
-        // 3) SearchServiceImpl 인스턴스 생성 (Lombok @RequiredArgsConstructor 기반)
-        SearchServiceImpl searchService = new SearchServiceImpl(braveWebClient, geminiClient);
+        GeminiAnswerGenerator answerGenerator = new GeminiAnswerGenerator(geminiClient);
 
         // @Value 주입되는 llmModel만 테스트에서 직접 세팅
-        ReflectionTestUtils.setField(searchService, "llmModel", "test-model");
+        ReflectionTestUtils.setField(answerGenerator, "llmModel", "test-model");
+        ReflectionTestUtils.setField(answerGenerator, "llmTimeoutSeconds", 12L);
 
         // 4) models.generateContent(...)가 항상 예외를 던지도록 설정
         when(models.generateContent(anyString(), anyString(), isNull()))
@@ -54,18 +51,11 @@ class SearchServiceImplLlmFallbackTest {
         );
         List<String> contents = List.of("본문 내용 일부");
 
-        // private 메서드 callLLM(String, List<SourceDto>, List<String>)을 reflection으로 호출
-        Method callLlmMethod = SearchServiceImpl.class
-                .getDeclaredMethod("callLLM", String.class, List.class, List.class);
-        callLlmMethod.setAccessible(true);
 
-        // when
-        String answer = (String) callLlmMethod.invoke(
-                searchService,
+        String answer = answerGenerator.generateAnswer(
                 "테스트 질문입니다.",
                 sources,
-                contents
-        );
+                contents);
 
         // then
         assertThat(answer)
@@ -85,9 +75,10 @@ class SearchServiceImplLlmFallbackTest {
         Models models = mock(Models.class);
         ReflectionTestUtils.setField(geminiClient, "models", models);
 
-        SearchServiceImpl searchService = new SearchServiceImpl(braveWebClient, geminiClient);
-        ReflectionTestUtils.setField(searchService, "llmModel", "test-model");
-        ReflectionTestUtils.setField(searchService, "llmTimeoutSeconds", 12L);
+        GeminiAnswerGenerator answerGenerator = new GeminiAnswerGenerator(geminiClient);
+
+        ReflectionTestUtils.setField(answerGenerator, "llmModel", "test-model");
+        ReflectionTestUtils.setField(answerGenerator, "llmTimeoutSeconds", 12L);
 
         // generateContent 호출 횟수 카운트
         AtomicInteger callCount = new AtomicInteger(0);
@@ -103,19 +94,11 @@ class SearchServiceImplLlmFallbackTest {
         );
         List<String> contents = List.of("본문 내용 일부");
 
-        Method callLlmMethod = SearchServiceImpl.class
-                .getDeclaredMethod("callLLM", String.class, List.class, List.class);
-        callLlmMethod.setAccessible(true);
-
         long start = System.currentTimeMillis();
 
-        // when
-        String answer = (String) callLlmMethod.invoke(
-                searchService,
-                "테스트 질문입니다.",
+        String answer = answerGenerator.generateAnswer(                "테스트 질문입니다.",
                 sources,
-                contents
-        );
+                contents);
 
         long elapsed = System.currentTimeMillis() - start;
 

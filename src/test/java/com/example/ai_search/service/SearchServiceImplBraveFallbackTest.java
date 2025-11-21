@@ -40,20 +40,22 @@ class SearchServiceImplBraveFallbackTest {
                 .exchangeFunction(fourXxExchange)
                 .build();
 
-        Client geminiClient = org.mockito.Mockito.mock(Client.class); // 사용 안 함
+        // BraveSourceRepository 인스턴스 직접 생성
+        BraveSourceRepository repo = new BraveSourceRepository(braveWebClient);
 
-        SearchServiceImpl searchService = new SearchServiceImpl(braveWebClient, geminiClient);
+        // @Value 값 강제로 주입
+        ReflectionTestUtils.setField(repo, "searchApiKey", "dummy");
+        ReflectionTestUtils.setField(repo, "searchTimeoutSeconds", 3L);
 
-        // @Value 주입되는 searchApiKey 더미 값 설정
-        ReflectionTestUtils.setField(searchService, "searchApiKey", "dummy-key");
+//        // private callBraveSearch 호출 준비
+//        Method method = BraveSourceRepository.class
+//                .getDeclaredMethod("callBraveSearch", String.class);
+//        method.setAccessible(true);
+//        @SuppressWarnings("unchecked")
+//        List<SourceDto> sources = (List<SourceDto>) method.invoke(repo, "테스트 쿼리");
 
-        // private 메서드 callBraveSearch(String)을 리플렉션으로 호출
-        Method method = SearchServiceImpl.class
-                .getDeclaredMethod("callBraveSearch", String.class);
-        method.setAccessible(true);
-
-        @SuppressWarnings("unchecked")
-        List<SourceDto> sources = (List<SourceDto>) method.invoke(searchService, "테스트 쿼리");
+        // when
+        List<SourceDto> sources = repo.getSources("테스트 쿼리");
 
         // then
         assertThat(sources).isNotNull();
@@ -83,24 +85,16 @@ class SearchServiceImplBraveFallbackTest {
                 .exchangeFunction(fiveXxExchange)
                 .build();
 
-        Client geminiClient = org.mockito.Mockito.mock(Client.class); // 사용 안 함
+        BraveSourceRepository repo = new BraveSourceRepository(braveWebClient);
 
-        SearchServiceImpl searchService = new SearchServiceImpl(braveWebClient, geminiClient);
+        ReflectionTestUtils.setField(repo, "searchApiKey", "dummy-key");
 
-        ReflectionTestUtils.setField(searchService, "searchApiKey", "dummy-key");
+        ReflectionTestUtils.setField(repo, "searchTimeoutSeconds", 3L);  // or 5L
 
-        ReflectionTestUtils.setField(searchService, "searchTimeoutSeconds", 3L);  // or 5L
-
-        Method method = SearchServiceImpl.class
-                .getDeclaredMethod("callBraveSearch", String.class);
-        method.setAccessible(true);
-
-        long start = System.currentTimeMillis();
-
-        @SuppressWarnings("unchecked")
-        List<SourceDto> sources = (List<SourceDto>) method.invoke(searchService, "테스트 쿼리");
-
+        long start = System.currentTimeMillis();;
+        List<SourceDto> sources = repo.getSources("테스트 쿼리");
         long elapsed = System.currentTimeMillis() - start;
+
 
         // then
         assertThat(sources).isNotNull();
