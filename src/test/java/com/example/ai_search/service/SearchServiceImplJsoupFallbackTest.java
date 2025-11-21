@@ -1,15 +1,11 @@
 package com.example.ai_search.service;
 
 import com.example.ai_search.dto.SourceDto;
-import com.google.genai.Client;
 import org.jsoup.Jsoup;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
-import org.springframework.web.reactive.function.client.WebClient;
-
-import java.lang.reflect.Method;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -21,7 +17,7 @@ class SearchServiceImplJsoupFallbackTest {
     void fetchPageTextsParallel_usesEmptyStringOnJsoupFailure() throws Exception {
 
 
-        JsoupContentFetcher contentFetcher = new JsoupContentFetcher();
+        JsoupContentFetcher contentFetcher = new JsoupContentFetcher(8, 3000, 3000);
 
         // 테스트용 SourceDto 리스트 (하나만 사용, 실패 케이스)
         SourceDto badSource = new SourceDto(1, "BAD", "https://bad.example.com", "bad snippet");

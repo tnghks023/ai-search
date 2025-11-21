@@ -3,6 +3,7 @@ package com.example.ai_search.service;
 import com.example.ai_search.dto.SourceDto;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -13,8 +14,20 @@ import java.util.concurrent.*;
 @Slf4j
 public class JsoupContentFetcher implements ContentFetcher{
 
-    private final ExecutorService jsoupExecutor =
-            Executors.newFixedThreadPool(8);
+    private final ExecutorService jsoupExecutor;
+    private final int httpTimeout;
+    private final int futureTimeout;
+
+    public JsoupContentFetcher(
+            @Value("${app.jsoup.thread-pool-size}") int poolSize,
+            @Value("${app.jsoup.http-timeout-ms}") int httpTimeout,
+            @Value("${app.jsoup.future-timeout-ms}") int futureTimeout
+    ) {
+        this.jsoupExecutor = Executors.newFixedThreadPool(poolSize);
+        this.httpTimeout = httpTimeout;
+        this.futureTimeout = futureTimeout;
+    }
+
 
     @Override
     public List<String> fetchContents(List<SourceDto> sources) {
@@ -33,7 +46,7 @@ public class JsoupContentFetcher implements ContentFetcher{
         for (int i = 0; i < futures.size(); i++) {
             CompletableFuture<String> f = futures.get(i);
             try {
-                String text = f.get(3, TimeUnit.SECONDS);
+                String text = f.get(futureTimeout, TimeUnit.MILLISECONDS);
                 contents.add(text != null ? text : "");
             } catch (TimeoutException e) {
                 log.warn("Jsoup async timeout for source index={}", i);
@@ -52,7 +65,7 @@ public class JsoupContentFetcher implements ContentFetcher{
         long start = System.currentTimeMillis();
         try {
             String text = Jsoup.connect(url)
-                    .timeout(2000)
+                    .timeout(httpTimeout)
                     .get()
                     .text();
 

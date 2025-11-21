@@ -10,6 +10,13 @@ llm:
     key: ${LLM_API_KEY}
   timeout-seconds: 8 # Gemini 타임아웃
 
+
+app:
+  jsoup:
+    http-timeout-ms: 2000
+    future-timeout-ms: 3000
+    thread-pool-size: 8
+
 spring:
   cache:
     cache-names: sourceCache, llmResultCache,  # LLM 답변 + 출처 캐시, 검색결과 캐시
