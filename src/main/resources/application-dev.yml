@@ -2,14 +2,16 @@
 search:
   api:
     key: ${SEARCH_API_KEY}
+    timeout-second: 4 # Brave 검색 타임아웃
 
 llm:
   model: gemini-2.0-flash-lite
   api:
     key: ${LLM_API_KEY}
+    timeout-seconds: 8 # Gemini 타임아웃
 
 spring:
   cache:
     cache-names: llmResultCache, sourceCache # LLM 답변 + 출처 캐시, 검색결과 캐시
     caffeine:
-      spec: maximumSize=1000, expireAfterWrite=30m
+      spec: maximumSize=500, expireAfterWrite=10m
