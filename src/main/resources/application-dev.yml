@@ -2,13 +2,13 @@
 search:
   api:
     key: ${SEARCH_API_KEY}
-    timeout-seconds: 4 # Brave 검색 타임아웃
+  timeout-seconds: 4 # Brave 검색 타임아웃
 
 llm:
   model: gemini-2.0-flash-lite
   api:
     key: ${LLM_API_KEY}
-    timeout-seconds: 8 # Gemini 타임아웃
+  timeout-seconds: 8 # Gemini 타임아웃
 
 spring:
   cache:
