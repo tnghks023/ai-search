@@ -30,6 +30,8 @@ public class GeminiAnswerGenerator implements AnswerGenerator{
     @Override
     public String generateAnswer(String query, List<SourceDto> sources, List<String> contents) {
 
+        log.info("GeminiAnswerGenerator.generateAnswer() CALLED. query='{}'", query);
+
         StringBuilder context = new StringBuilder();
 
         for (int i = 0; i < Math.min(sources.size(), contents.size()); i++) {
