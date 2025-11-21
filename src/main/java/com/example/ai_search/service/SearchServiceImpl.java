@@ -16,6 +16,8 @@ import java.util.concurrent.*;
 @Slf4j
 public class SearchServiceImpl implements SearchService{
 
+    private static final String CACHE_NAME = "llmResultCache";
+
     private final SourceRepository sourceRepository;
     private final ContentFetcher contentFetcher;
     private final AnswerGenerator answerGenerator;
@@ -23,18 +25,37 @@ public class SearchServiceImpl implements SearchService{
     private final CacheManager cacheManager;
 
     @Override
-    @Cacheable(
-            value = "llmResultCache",
-            key = "@queryNormalizer.normalize(#query)"  // 정규화된 쿼리로 캐시 키 사용
-    )
     public SearchResponseDto search(String query) {
 
         String normalized = queryNormalizer.normalize(query);
 
-        logCacheHitOrMiss(normalized);
-
         long totalStart = System.currentTimeMillis();
         log.info("Search pipeline start. raw='{}', normalized='{}'", query, normalized);
+
+        // 2) 캐시 조회 (HIT이면 바로 리턴, 단 fallback은 사용/저장 안 함)
+        Cache cache = cacheManager.getCache(CACHE_NAME);
+        if (cache != null) {
+            SearchResponseDto cached = cache.get(normalized, SearchResponseDto.class);
+            if (cached != null) {
+                if (isFallback(cached)) {
+                    log.info("Cache HIT with fallback, but ignoring. cache='{}', key='{}'", CACHE_NAME, normalized);
+                    // 캐시에 들어있긴 하지만, fallback이면 사용하지 않고 다시 파이프라인 실행
+                } else {
+                    log.info("Cache HIT. cache='{}', key='{}', sources={}, answerLength={}",
+                            CACHE_NAME,
+                            normalized,
+                            cached.getSources() != null ? cached.getSources().size() : 0,
+                            cached.getAnswer() != null ? cached.getAnswer().length() : 0);
+                    long totalMs = System.currentTimeMillis() - totalStart;
+                    log.info("Search pipeline short-circuited by cache. normalized='{}', totalMs={}", normalized, totalMs);
+                    return cached;
+                }
+            } else {
+                log.info("Cache MISS. cache='{}', key='{}'", CACHE_NAME, normalized);
+            }
+        } else {
+            log.warn("Cache '{}' not found. (CacheManager misconfigured?)", CACHE_NAME);
+        }
 
         long braveStart = System.currentTimeMillis();
         List<SourceDto> sources = sourceRepository.getSources(normalized);
@@ -54,8 +75,7 @@ public class SearchServiceImpl implements SearchService{
 
             SearchResponseDto dto = new SearchResponseDto(answer, List.of());
 
-            // 🔥 캐시에 저장될 값 로깅 (실패 fallback도 캐시에 들어감)
-            logCachePut(normalized, dto);
+            log.info("Cache PUT skipped (fallback or no sources). cache='{}', key='{}'", CACHE_NAME, normalized);
 
             return dto;
         }
@@ -69,6 +89,9 @@ public class SearchServiceImpl implements SearchService{
 
         long totalMs = System.currentTimeMillis() - totalStart;
 
+
+        SearchResponseDto dto = new SearchResponseDto(answer, sources);
+
         log.info(
                 "Search pipeline summary. query='{}', sources={}, braveMs={}, jsoupMs={}, llmMs={}, totalMs={}",
                 normalized,
@@ -79,52 +102,53 @@ public class SearchServiceImpl implements SearchService{
                 totalMs
         );
 
-        SearchResponseDto dto = new SearchResponseDto(answer, sources);
-
-        logCachePut(normalized, dto);
+        // 4) 결과를 캐시에 넣을지 결정 (fallback이면 저장 X)
+        if (cache != null) {
+            if (isFallback(dto)) {
+                log.info(
+                        "Cache PUT skipped (fallback result). cache='{}', key='{}', sources={}, answerLength={}",
+                        CACHE_NAME,
+                        normalized,
+                        dto.getSources() != null ? dto.getSources().size() : 0,
+                        dto.getAnswer() != null ? dto.getAnswer().length() : 0
+                );
+            } else {
+                cache.put(normalized, dto);
+                log.info(
+                        "Cache PUT. cache='{}', key='{}', sources={}, answerLength={}",
+                        CACHE_NAME,
+                        normalized,
+                        dto.getSources() != null ? dto.getSources().size() : 0,
+                        dto.getAnswer() != null ? dto.getAnswer().length() : 0
+                );
+            }
+        }
 
         return dto;
     }
 
     /**
-     * 캐시 HIT/MISS 로깅
-     * 주의: @Cacheable 프록시 구조상, 이 메서드는 "MISS일 때만" 실행되는 게 정상임.
+     * 이 SearchResponseDto가 "fallback 응답"인지 여부를 판단하는 헬퍼.
+     * - sources가 비었으면 fallback으로 간주
+     * - answer에 특정 fallback 문구가 포함되어도 fallback으로 간주
      */
-    private void logCacheHitOrMiss(String normalizedQuery) {
-        Cache cache = cacheManager.getCache("llmResultCache");
-        if (cache == null) {
-            log.warn("Cache 'llmResultCache' not found. (cacheManager misconfigured?)");
-            return;
+    private boolean isFallback(SearchResponseDto dto) {
+        if (dto == null) return true;
+
+        // 1) 출처가 하나도 없으면 fallback으로 본다 (Brave 실패 케이스 등)
+        if (dto.getSources() == null || dto.getSources().isEmpty()) {
+            return true;
         }
 
-        Cache.ValueWrapper wrapper = cache.get(normalizedQuery);
+        // 2) answer 내용으로 fallback 여부 추가 판별 (Gemini 실패 케이스)
+        String answer = dto.getAnswer();
+        if (answer == null) return true;
 
-        if (wrapper == null) {
-            log.info("Cache MISS. key='{}'", normalizedQuery);
-        } else {
-            log.info("Cache HIT. key='{}'", normalizedQuery);
+        if (answer.contains("현재는 질문에 대한 답변을 생성할 수 없습니다.")
+                || answer.contains("외부 검색(Brave)에서 결과를 가져오지 못했습니다.")) {
+            return true;
         }
-    }
 
-    /**
-     * 캐시 저장 예정 로깅
-     * 실제 put은 @Cacheable 프록시에서 처리하지만,
-     * "어떤 key로, 어떤 요약 결과가 캐시에 들어가려는지"를 남겨둔다.
-     */
-    private void logCachePut(String normalizedQuery, SearchResponseDto dto) {
-        try {
-            int sourceCount = (dto.getSources() != null) ? dto.getSources().size() : 0;
-            int answerLength = (dto.getAnswer() != null) ? dto.getAnswer().length() : 0;
-
-            log.info(
-                    "Cache PUT scheduled. cache='llmResultCache', key='{}', sources={}, answerLength={}",
-                    normalizedQuery,
-                    sourceCount,
-                    answerLength
-            );
-        } catch (Exception e) {
-            // 로깅 중 문제 생겨도 본 로직에는 영향 없게
-            log.warn("Failed to log cache PUT info. key='{}', reason={}", normalizedQuery, e.toString());
-        }
+        return false;
     }
 }
