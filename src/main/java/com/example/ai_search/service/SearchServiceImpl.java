@@ -4,6 +4,8 @@ import com.example.ai_search.dto.SearchResponseDto;
 import com.example.ai_search.dto.SourceDto;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -18,6 +20,7 @@ public class SearchServiceImpl implements SearchService{
     private final ContentFetcher contentFetcher;
     private final AnswerGenerator answerGenerator;
     private final QueryNormalizer queryNormalizer;
+    private final CacheManager cacheManager;
 
     @Override
     @Cacheable(
@@ -27,6 +30,8 @@ public class SearchServiceImpl implements SearchService{
     public SearchResponseDto search(String query) {
 
         String normalized = queryNormalizer.normalize(query);
+
+        logCacheHitOrMiss(normalized);
 
         long totalStart = System.currentTimeMillis();
         log.info("Search pipeline start. raw='{}', normalized='{}'", query, normalized);
@@ -47,7 +52,12 @@ public class SearchServiceImpl implements SearchService{
                     잠시 후 다시 시도해 주세요.
                     """;
 
-            return new SearchResponseDto(answer, List.of());
+            SearchResponseDto dto = new SearchResponseDto(answer, List.of());
+
+            // 🔥 캐시에 저장될 값 로깅 (실패 fallback도 캐시에 들어감)
+            logCachePut(normalized, dto);
+
+            return dto;
         }
         long jsoupStart = System.currentTimeMillis();
         List<String> contents = contentFetcher.fetchContents(sources);
@@ -69,6 +79,52 @@ public class SearchServiceImpl implements SearchService{
                 totalMs
         );
 
-        return new SearchResponseDto(answer, sources);
+        SearchResponseDto dto = new SearchResponseDto(answer, sources);
+
+        logCachePut(normalized, dto);
+
+        return dto;
+    }
+
+    /**
+     * 캐시 HIT/MISS 로깅
+     * 주의: @Cacheable 프록시 구조상, 이 메서드는 "MISS일 때만" 실행되는 게 정상임.
+     */
+    private void logCacheHitOrMiss(String normalizedQuery) {
+        Cache cache = cacheManager.getCache("llmResultCache");
+        if (cache == null) {
+            log.warn("Cache 'llmResultCache' not found. (cacheManager misconfigured?)");
+            return;
+        }
+
+        Cache.ValueWrapper wrapper = cache.get(normalizedQuery);
+
+        if (wrapper == null) {
+            log.info("Cache MISS. key='{}'", normalizedQuery);
+        } else {
+            log.info("Cache HIT. key='{}'", normalizedQuery);
+        }
+    }
+
+    /**
+     * 캐시 저장 예정 로깅
+     * 실제 put은 @Cacheable 프록시에서 처리하지만,
+     * "어떤 key로, 어떤 요약 결과가 캐시에 들어가려는지"를 남겨둔다.
+     */
+    private void logCachePut(String normalizedQuery, SearchResponseDto dto) {
+        try {
+            int sourceCount = (dto.getSources() != null) ? dto.getSources().size() : 0;
+            int answerLength = (dto.getAnswer() != null) ? dto.getAnswer().length() : 0;
+
+            log.info(
+                    "Cache PUT scheduled. cache='llmResultCache', key='{}', sources={}, answerLength={}",
+                    normalizedQuery,
+                    sourceCount,
+                    answerLength
+            );
+        } catch (Exception e) {
+            // 로깅 중 문제 생겨도 본 로직에는 영향 없게
+            log.warn("Failed to log cache PUT info. key='{}', reason={}", normalizedQuery, e.toString());
+        }
     }
 }
