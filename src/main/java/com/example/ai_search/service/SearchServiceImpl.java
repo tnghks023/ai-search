@@ -18,14 +18,23 @@ public class SearchServiceImpl implements SearchService{
     private final SourceRepository sourceRepository;
     private final ContentFetcher contentFetcher;
     private final AnswerGenerator answerGenerator;
+    private final QueryNormalizer queryNormalizer;
 
     @Override
-    @Cacheable(value = "llmResultCache", key = "#query")
     public SearchResponseDto search(String query) {
+
+        String normalizedQuery = queryNormalizer.normalize(query);
+
+        log.info("Search requested. raw='{}', normalized='{}'", query, normalizedQuery);
+
+        return searchInternal(normalizedQuery);
+    }
+
+    @Cacheable(value = "llmResultCache", key = "#query")
+    public SearchResponseDto searchInternal(String query) {
 
         long totalStart = System.currentTimeMillis();
         log.info("Search pipeline start. query='{}'", query);
-
         long braveStart = System.currentTimeMillis();
         List<SourceDto> sources = sourceRepository.getSources(query);
         long braveMs = System.currentTimeMillis() - braveStart;

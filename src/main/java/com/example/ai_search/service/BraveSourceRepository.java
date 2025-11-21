@@ -32,7 +32,6 @@ public class BraveSourceRepository implements SourceRepository{
     @Value("${search.timeout-seconds:8}")
     private long searchTimeoutSeconds;
 
-
     @Override
     @Cacheable(value = "sourceCache", key = "#query")
     public List<SourceDto> getSources(String query) {
