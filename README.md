@@ -16,7 +16,7 @@ Perplexity의 검색 파이프라인 구조(검색 → 크롤링 → 요약)를 
 
   * **4xx → 재시도 없이 즉시 fallback**
   * **5xx → retry(backoff) 후 마지막에 fallback**
-* 전체 timeout 3초
+* 전체 timeout 8초
 * MDC 기반 traceId → X-Trace-Id 헤더로 외부 API에도 전파
 * 장애 발생 시 **빈 리스트 graceful fallback**
 
@@ -25,8 +25,8 @@ Perplexity의 검색 파이프라인 구조(검색 → 크롤링 → 요약)를 
 ## 2️⃣ Jsoup 병렬 크롤링 (본문 텍스트 수집)
 
 * 8개 스레드 풀
-* URL당 Jsoup timeout 2초
-* Future 논리 timeout 3초
+* URL당 Jsoup timeout 3초
+* Future 논리 timeout 4초
 * 일부 URL 실패해도 전체 파이프라인 유지
 * 텍스트 최대 2,000자만 사용해 LLM 비용 절약
 
@@ -38,7 +38,7 @@ Perplexity의 검색 파이프라인 구조(검색 → 크롤링 → 요약)를 
 * LLM 호출:
 
   * 2회 재시도
-  * 시도당 timeout 4초
+  * 시도당 timeout 20초
   * backoff(300ms → 600ms)
 * 최종 실패 시 **fallback 메시지 생성(검색 결과는 유지)**
 * 답변 문장 끝에 [1], [2] 형태로 출처 번호 포함
