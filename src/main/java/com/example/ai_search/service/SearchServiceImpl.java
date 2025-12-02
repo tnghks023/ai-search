@@ -22,7 +22,6 @@ public class SearchServiceImpl implements SearchService{
     private final ContentFetcher contentFetcher;
     private final AnswerGenerator answerGenerator;
     private final QueryNormalizer queryNormalizer;
-    private final CacheManager cacheManager;
 
     @Override
 

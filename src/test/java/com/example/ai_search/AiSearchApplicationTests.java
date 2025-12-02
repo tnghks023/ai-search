@@ -7,7 +7,8 @@ import org.springframework.boot.test.context.SpringBootTest;
         "llm.api.key=dummy-llm-key",
         "llm.model=gemini-test-model",
         "search.api.key=dummy-search-key",
-        "spring.profiles.active=dev"
+        "spring.profiles.active=dev",
+        "spring.cache.type=none"
 })
 class AiSearchApplicationTests {
 
