@@ -30,10 +30,13 @@ import static org.mockito.Mockito.*;
         },
         properties = {
                 "SEARCH_API_KEY=dummy",
-                "LLM_API_KEY=dummy"
+                "LLM_API_KEY=dummy",
+                "app.jsoup.http-timeout-ms=8000",
+                "app.jsoup.future-timeout-ms=8000",
+                "app.jsoup.thread-pool-size=4"
         }
 )
-@ActiveProfiles("test")  // 🔥 CacheConfig(@Profile("!test")) 를 비활성화
+@ActiveProfiles("test")  // CacheConfig(@Profile("!test")) 를 비활성화
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 class SearchServiceImplIntegrationTest {
 

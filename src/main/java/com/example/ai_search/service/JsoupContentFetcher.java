@@ -19,9 +19,9 @@ public class JsoupContentFetcher implements ContentFetcher{
     private final int futureTimeout;
 
     public JsoupContentFetcher(
-            @Value("${app.jsoup.thread-pool-size}") int poolSize,
-            @Value("${app.jsoup.http-timeout-ms}") int httpTimeout,
-            @Value("${app.jsoup.future-timeout-ms}") int futureTimeout
+            @Value("${app.jsoup.thread-pool-size:8}") int poolSize,
+            @Value("${app.jsoup.http-timeout-ms:3000}") int httpTimeout,
+            @Value("${app.jsoup.future-timeout-ms:4000}") int futureTimeout
     ) {
         this.jsoupExecutor = Executors.newFixedThreadPool(poolSize);
         this.httpTimeout = httpTimeout;
