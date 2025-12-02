@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheConfig;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
@@ -22,6 +23,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
+@CacheConfig(cacheManager = "caffeineCacheManager", cacheNames = "sourceCache")
 public class BraveSourceRepository implements SourceRepository{
 
     private final WebClient braveWebClient;
@@ -33,18 +35,18 @@ public class BraveSourceRepository implements SourceRepository{
     private long searchTimeoutSeconds;
 
     @Override
-    @Cacheable(value = "sourceCache", key = "#query")
-    public List<SourceDto> getSources(String query) {
+    @Cacheable
+    public List<SourceDto> getSources(String normalizedQuery) {
 
         long start = System.currentTimeMillis();
-        log.info("Search requested. query='{}'", query);
+        log.info("Search requested. query='{}'", normalizedQuery);
 
         String traceId = MDC.get("traceId");
 
         Mono<List<SourceDto>> mono = braveWebClient.get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/res/v1/web/search")
-                        .queryParam("q", query)
+                        .queryParam("q", normalizedQuery)
                         .queryParam("count", 3)
                         .build()
                 )
@@ -71,7 +73,7 @@ public class BraveSourceRepository implements SourceRepository{
                 .log("BRAVE_WEBCLIENT")
                 .doOnNext(resp ->
                         log.debug("Brave DTO response for query='{}', resultCount={}",
-                                query,
+                                normalizedQuery,
                                 resp.getWeb() != null && resp.getWeb().getResults() != null
                                         ? resp.getWeb().getResults().size()
                                         : 0
@@ -95,7 +97,7 @@ public class BraveSourceRepository implements SourceRepository{
 
         long elapsed = System.currentTimeMillis() - start;
         log.info("Brave search done. query='{}', resultCount={}, elapsedMs={}",
-                query, sources.size(), elapsed);
+                normalizedQuery, sources.size(), elapsed);
 
         return sources;
     }
