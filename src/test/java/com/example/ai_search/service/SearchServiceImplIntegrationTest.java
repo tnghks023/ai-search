@@ -11,6 +11,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
@@ -25,7 +26,8 @@ import static org.mockito.Mockito.*;
 
 @SpringBootTest(
         classes = {
-                AiSearchApplication.class,
+                SearchServiceImpl.class,       // 우리가 테스트할 서비스
+                QueryNormalizer.class,         // 실제 사용
                 SearchServiceImplIntegrationTest.TestCacheConfig.class
         },
         properties = {
@@ -41,6 +43,7 @@ import static org.mockito.Mockito.*;
 class SearchServiceImplIntegrationTest {
 
     @TestConfiguration
+    @EnableCaching
     static class TestCacheConfig {
 
         // SearchServiceImpl 이 @CacheConfig(cacheManager = "redisCacheManager") 로 바라보는 놈
@@ -67,7 +70,7 @@ class SearchServiceImplIntegrationTest {
     QueryNormalizer queryNormalizer;
 
     @Autowired
-    SearchServiceImpl searchService;
+    SearchService searchService;
 
     @Autowired
     @Qualifier("redisCacheManager")
