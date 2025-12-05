@@ -207,8 +207,6 @@ SPRING_PROFILES_ACTIVE=prod
 * DI + Mock 기반 테스트 주도 개발
 * Redis Cloud + Caffeine 기반 2단계 캐시 아키텍처
 
-기업에서 매우 선호하는 백엔드 구조를 모두 담고 있습니다.
 
 ---
 
-URL만 알려주면 Demo 섹션에 바로 반영해서 최종 README.md 만들어줄게!
