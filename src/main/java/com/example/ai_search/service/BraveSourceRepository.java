@@ -35,7 +35,7 @@ public class BraveSourceRepository implements SourceRepository{
     private long searchTimeoutSeconds;
 
     @Override
-    @Cacheable
+    @Cacheable(key = "#normalizedQuery")
     public List<SourceDto> getSources(String normalizedQuery) {
 
         long start = System.currentTimeMillis();
