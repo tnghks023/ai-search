@@ -8,7 +8,10 @@ import org.springframework.boot.test.context.SpringBootTest;
         "llm.model=gemini-test-model",
         "search.api.key=dummy-search-key",
         "spring.profiles.active=dev",
-        "spring.cache.type=none"
+        "spring.cache.type=none",
+        "REDIS_HOST=localhost",
+        "REDIS_PORT=6379",
+        "REDIS_PASSWORD=dummy"
 })
 class AiSearchApplicationTests {
 
